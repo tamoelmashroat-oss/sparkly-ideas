@@ -10,14 +10,21 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 const API = "https://api.supabase.com/v1";
 
 async function mgmt<T>(token: string, path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API}${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
+  // Retry on rate limiting (429) with exponential backoff.
+  let res!: Response;
+  for (let attempt = 0; attempt < 6; attempt++) {
+    res = await fetch(`${API}${path}`, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        ...(init?.headers ?? {}),
+      },
+    });
+    if (res.status !== 429 && res.status !== 503) break;
+    const ra = Number(res.headers.get("retry-after"));
+    await new Promise((r) => setTimeout(r, ra > 0 ? ra * 1000 : 1500 * 2 ** attempt));
+  }
   const text = await res.text();
   if (!res.ok) {
     if (res.status === 401 || res.status === 403) {
