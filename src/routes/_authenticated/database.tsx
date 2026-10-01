@@ -104,6 +104,11 @@ function DatabasePage() {
   const [authRunning, setAuthRunning] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authDone, setAuthDone] = useState(false);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [phase, setPhase] = useState<{ label: string; counting: boolean }>({
+    label: "",
+    counting: false,
+  });
   const authLogBox = useRef<HTMLDivElement>(null);
 
   const fetchProjects = useServerFn(listSupabaseProjects);
@@ -157,11 +162,15 @@ function DatabasePage() {
   const canRun = bothPicked && !sameProject && !!report && confirmWipe && !running;
 
   async function runMigration() {
+    const tables = (report?.tables ?? []).filter((t) => t.rows > 0);
+    const totalRows = tables.reduce((sum, t) => sum + t.rows, 0);
     setRunning(true);
     setFinished(false);
     setError(null);
     setLog([]);
-    setProgress(null);
+    setStartedAt(Date.now());
+    setProgress({ done: 0, total: totalRows });
+    setPhase({ label: "المرحلة 1 من 4: تفريغ المشروع الهدف…", counting: false });
     const creds = {
       sourceToken: token.source.trim(),
       sourceRef: ref.source,
@@ -173,17 +182,19 @@ function DatabasePage() {
       await reset({ data: { token: creds.targetToken, ref: creds.targetRef, confirm: true } });
       push("   تم حذف محتوى المخطط public في الهدف.");
 
+      setPhase({ label: "المرحلة 2 من 4: إنشاء الجداول والدوال…", counting: false });
       push("② إنشاء الأنواع والدوال والجداول…");
       const s1 = await structure({ data: creds });
       push(`   نُفِّذ ${s1.applied} من ${s1.total} أمرًا.`);
       s1.errors.slice(0, 5).forEach((e) => push(`   ⚠ ${e}`));
 
-      const tables = (report?.tables ?? []).filter((t) => t.rows > 0);
-      const totalRows = tables.reduce((sum, t) => sum + t.rows, 0);
-      setProgress({ done: 0, total: totalRows });
       push(`③ نسخ البيانات (${totalRows} صفًا في ${tables.length} جدولًا)…`);
       let done = 0;
-      for (const table of tables) {
+      for (const [i, table] of tables.entries()) {
+        setPhase({
+          label: `المرحلة 3 من 4: نسخ البيانات — ${table.name} (${i + 1}/${tables.length})`,
+          counting: true,
+        });
         let offset = 0;
         for (;;) {
           const res = await copyChunk({
@@ -197,6 +208,10 @@ function DatabasePage() {
         push(`   ${table.name}: ${offset} صفًا.`);
       }
 
+      setPhase({
+        label: "المرحلة 4 من 4: العلاقات والفهارس وقواعد الحماية (قد تستغرق دقائق)…",
+        counting: false,
+      });
       push("④ إضافة العلاقات والفهارس وقواعد الحماية…");
       const s2 = await extras({ data: creds });
       push(`   نُفِّذ ${s2.applied} من ${s2.total} أمرًا.`);
@@ -564,12 +579,16 @@ function DatabasePage() {
                 ابدأ النقل
               </Button>
 
-              {progress && progress.total > 0 && (
+              {progress && (running || progress.total > 0) && (
                 <LiveProgress
                   done={progress.done}
                   total={progress.total}
                   unit="صفًا"
                   running={running}
+                  stage={phase.label}
+                  startedAt={startedAt}
+                  estimate={phase.counting}
+                  failed={!!error}
                 />
               )}
 
