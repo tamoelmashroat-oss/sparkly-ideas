@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation } from "@tanstack/react-query";
 import { useRef, useState } from "react";
+import { LiveProgress } from "@/components/LiveProgress";
 import {
   CheckCircle2,
   Database,
@@ -564,17 +565,12 @@ function DatabasePage() {
               </Button>
 
               {progress && progress.total > 0 && (
-                <div className="flex flex-col gap-1">
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-border">
-                    <div
-                      className="h-full bg-primary transition-all"
-                      style={{ width: `${Math.min(100, (progress.done / progress.total) * 100)}%` }}
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {progress.done} / {progress.total} صفًا
-                  </p>
-                </div>
+                <LiveProgress
+                  done={progress.done}
+                  total={progress.total}
+                  unit="صفًا"
+                  running={running}
+                />
               )}
 
               {error && (
@@ -679,19 +675,12 @@ function DatabasePage() {
               </Button>
 
               {storageProgress && storageProgress.total > 0 && (
-                <div className="flex flex-col gap-1">
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-border">
-                    <div
-                      className="h-full bg-primary transition-all"
-                      style={{
-                        width: `${Math.min(100, (storageProgress.done / storageProgress.total) * 100)}%`,
-                      }}
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {storageProgress.done} / {storageProgress.total} ملفًا
-                  </p>
-                </div>
+                <LiveProgress
+                  done={storageProgress.done}
+                  total={storageProgress.total}
+                  unit="ملفًا"
+                  running={storageRunning}
+                />
               )}
 
               {storageError && (
