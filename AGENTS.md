@@ -12,3 +12,5 @@
 - Authenticated pages render inside a shared sidebar layout (`AppSidebar` in `src/routes/_authenticated/route.tsx`); page headers must not duplicate nav/admin/logout — the sidebar owns them.
 - The sidebar's "من مستودع لآخر في GitHub واحد" deep-links to `/transfer?mode=same`, which preselects the same-account toggle on the transfer page.
 - Use the splat route to redirect legacy `/index` visits to `/`; a dedicated index-named route collides with the root index route generator.
+- Supabase transfers run as resumable server-side jobs (`transfer_jobs` table + `src/lib/transferEngine.server.ts`); each advance does a bounded slice and saves a cursor, so work never depends on one long request or an open browser.
+- Background progress when no tab is open comes from `/api/public/transfer-tick` being called by an external scheduler; open tabs also advance jobs via `nudgeTransferJobs`.
