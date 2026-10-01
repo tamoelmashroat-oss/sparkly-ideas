@@ -57,8 +57,11 @@ export function LiveProgress({
   }
   if (!estimate) countStart.current = null;
 
+  const selfStart = useRef<number | null>(null);
+  if (running && selfStart.current === null) selfStart.current = Date.now();
   const t = endRef.current ?? now;
-  const elapsed = startedAt ? (t - startedAt) / 1000 : 0;
+  const base = startedAt ?? selfStart.current;
+  const elapsed = base ? (t - base) / 1000 : 0;
   const pct = total > 0 ? Math.min(100, (done / total) * 100) : 0;
   const complete = !running && !failed && done >= total && total > 0;
 
