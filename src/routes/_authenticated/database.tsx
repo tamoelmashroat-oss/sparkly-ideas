@@ -579,12 +579,16 @@ function DatabasePage() {
                 ابدأ النقل
               </Button>
 
-              {progress && progress.total > 0 && (
+              {progress && (running || progress.total > 0) && (
                 <LiveProgress
                   done={progress.done}
                   total={progress.total}
                   unit="صفًا"
                   running={running}
+                  stage={phase.label}
+                  startedAt={startedAt}
+                  estimate={phase.counting}
+                  failed={!!error}
                 />
               )}
 
