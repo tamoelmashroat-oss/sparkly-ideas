@@ -189,16 +189,25 @@ async function stmts(token: string, ref: string, query: string): Promise<string[
 
 /** Apply statements one by one; collect failures instead of aborting. */
 async function apply(token: string, ref: string, list: string[]) {
+  // Multiple passes: objects that depend on others (e.g. a view built on
+  // another view) succeed once their dependency exists.
   let applied = 0;
-  const errors: string[] = [];
-  for (const s of list) {
-    try {
-      await runSql(token, ref, s);
-      applied += 1;
-    } catch (e) {
-      errors.push(`${s.slice(0, 160)} → ${(e as Error).message}`);
+  let pending = list;
+  let failed: { s: string; msg: string }[] = [];
+  for (let pass = 0; pass < 5 && pending.length > 0; pass++) {
+    failed = [];
+    for (const s of pending) {
+      try {
+        await runSql(token, ref, s);
+        applied += 1;
+      } catch (e) {
+        failed.push({ s, msg: (e as Error).message });
+      }
     }
+    if (failed.length === pending.length) break; // no progress
+    pending = failed.map((f) => f.s);
   }
+  const errors = failed.map((f) => `${f.s.slice(0, 160)} → ${f.msg}`);
   return { applied, errors };
 }
 
