@@ -1,11 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { JobHistory, JobPanel, useTransferJobs } from "@/components/TransferJobs";
 import { startTransferJob } from "@/lib/transferJobs.functions";
 import {
-  CheckCircle2,
   Database,
   ExternalLink,
   FolderSync,
