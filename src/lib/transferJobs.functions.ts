@@ -32,8 +32,8 @@ export const startTransferJob = createServerFn({ method: "POST" })
       sourceRef: string;
       targetToken: string;
       targetRef: string;
-      sourceName?: string;
-      targetName?: string;
+      sourceName?: string | undefined;
+      targetName?: string | undefined;
     }) => {
       if (!["db", "storage", "auth"].includes(input.kind)) throw new Error("نوع نقل غير معروف.");
       if (!input.sourceToken || !input.sourceRef || !input.targetToken || !input.targetRef)

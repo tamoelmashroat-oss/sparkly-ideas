@@ -581,8 +581,8 @@ export async function createJob(input: {
   kind: JobKind;
   sourceRef: string;
   targetRef: string;
-  sourceName?: string;
-  targetName?: string;
+  sourceName?: string | undefined;
+  targetName?: string | undefined;
   tokens: Tokens;
 }) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -668,7 +668,7 @@ export async function advanceJob(id: string): Promise<void> {
     update["tokens_ciphertext"] = null;
     if (!cancelled) update["status"] = failure ? "failed" : "completed";
   }
-  await supabaseAdmin.from("transfer_jobs").update(update).eq("id", id);
+  await supabaseAdmin.from("transfer_jobs").update(update as never).eq("id", id);
 }
 
 /** Advance every running job (used by the public tick endpoint). */
