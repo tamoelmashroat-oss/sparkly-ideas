@@ -10,14 +10,21 @@ const API = "https://api.supabase.com/v1";
 type Row = Record<string, unknown>;
 
 async function mgmt<T>(token: string, path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API}${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
+  // Retry on rate limiting (429) with exponential backoff.
+  let res!: Response;
+  for (let attempt = 0; attempt < 6; attempt++) {
+    res = await fetch(`${API}${path}`, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        ...(init?.headers ?? {}),
+      },
+    });
+    if (res.status !== 429 && res.status !== 503) break;
+    const ra = Number(res.headers.get("retry-after"));
+    await new Promise((r) => setTimeout(r, ra > 0 ? ra * 1000 : 1500 * 2 ** attempt));
+  }
   const text = await res.text();
   if (!res.ok) {
     let msg = text;
@@ -182,16 +189,25 @@ async function stmts(token: string, ref: string, query: string): Promise<string[
 
 /** Apply statements one by one; collect failures instead of aborting. */
 async function apply(token: string, ref: string, list: string[]) {
+  // Multiple passes: objects that depend on others (e.g. a view built on
+  // another view) succeed once their dependency exists.
   let applied = 0;
-  const errors: string[] = [];
-  for (const s of list) {
-    try {
-      await runSql(token, ref, s);
-      applied += 1;
-    } catch (e) {
-      errors.push(`${s.slice(0, 160)} → ${(e as Error).message}`);
+  let pending = list;
+  let failed: { s: string; msg: string }[] = [];
+  for (let pass = 0; pass < 5 && pending.length > 0; pass++) {
+    failed = [];
+    for (const s of pending) {
+      try {
+        await runSql(token, ref, s);
+        applied += 1;
+      } catch (e) {
+        failed.push({ s, msg: (e as Error).message });
+      }
     }
+    if (failed.length === pending.length) break; // no progress
+    pending = failed.map((f) => f.s);
   }
+  const errors = failed.map((f) => `${f.s.slice(0, 160)} → ${f.msg}`);
   return { applied, errors };
 }
 
