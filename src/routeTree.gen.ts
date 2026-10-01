@@ -10,33 +10,133 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SplatRouteImport } from './routes/$'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedDatabaseRouteImport } from './routes/_authenticated/database'
+import { Route as AuthenticatedTransferRouteImport } from './routes/_authenticated/transfer'
+import { Route as AuthenticatedSupabaseWithinRouteImport } from './routes/_authenticated/supabase.within'
+import { Route as OauthGithubReturnRouteImport } from './routes/oauth/github/return'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SplatRoute = SplatRouteImport.update({
+  id: '/$',
+  path: '/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedDatabaseRoute = AuthenticatedDatabaseRouteImport.update({
+  id: '/database',
+  path: '/database',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedTransferRoute = AuthenticatedTransferRouteImport.update({
+  id: '/transfer',
+  path: '/transfer',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedSupabaseWithinRoute =
+  AuthenticatedSupabaseWithinRouteImport.update({
+    id: '/supabase/within',
+    path: '/supabase/within',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const OauthGithubReturnRoute = OauthGithubReturnRouteImport.update({
+  id: '/oauth/github/return',
+  path: '/oauth/github/return',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/$': typeof SplatRoute
+  '/auth': typeof AuthRoute
+  '/admin': typeof AuthenticatedAdminRoute
+  '/database': typeof AuthenticatedDatabaseRoute
+  '/transfer': typeof AuthenticatedTransferRoute
+  '/supabase/within': typeof AuthenticatedSupabaseWithinRoute
+  '/oauth/github/return': typeof OauthGithubReturnRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/$': typeof SplatRoute
+  '/auth': typeof AuthRoute
+  '/admin': typeof AuthenticatedAdminRoute
+  '/database': typeof AuthenticatedDatabaseRoute
+  '/transfer': typeof AuthenticatedTransferRoute
+  '/supabase/within': typeof AuthenticatedSupabaseWithinRoute
+  '/oauth/github/return': typeof OauthGithubReturnRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/$': typeof SplatRoute
+  '/auth': typeof AuthRoute
+  '/_authenticated/admin': typeof AuthenticatedAdminRoute
+  '/_authenticated/database': typeof AuthenticatedDatabaseRoute
+  '/_authenticated/transfer': typeof AuthenticatedTransferRoute
+  '/_authenticated/supabase/within': typeof AuthenticatedSupabaseWithinRoute
+  '/oauth/github/return': typeof OauthGithubReturnRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/$'
+    | '/auth'
+    | '/admin'
+    | '/database'
+    | '/transfer'
+    | '/supabase/within'
+    | '/oauth/github/return'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/$'
+    | '/auth'
+    | '/admin'
+    | '/database'
+    | '/transfer'
+    | '/supabase/within'
+    | '/oauth/github/return'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/$'
+    | '/auth'
+    | '/_authenticated/admin'
+    | '/_authenticated/database'
+    | '/_authenticated/transfer'
+    | '/_authenticated/supabase/within'
+    | '/oauth/github/return'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  SplatRoute: typeof SplatRoute
+  AuthRoute: typeof AuthRoute
+  OauthGithubReturnRoute: typeof OauthGithubReturnRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +148,88 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/$': {
+      id: '/$'
+      path: '/$'
+      fullPath: '/$'
+      preLoaderRoute: typeof SplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/database': {
+      id: '/_authenticated/database'
+      path: '/database'
+      fullPath: '/database'
+      preLoaderRoute: typeof AuthenticatedDatabaseRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/transfer': {
+      id: '/_authenticated/transfer'
+      path: '/transfer'
+      fullPath: '/transfer'
+      preLoaderRoute: typeof AuthenticatedTransferRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/supabase/within': {
+      id: '/_authenticated/supabase/within'
+      path: '/supabase/within'
+      fullPath: '/supabase/within'
+      preLoaderRoute: typeof AuthenticatedSupabaseWithinRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/oauth/github/return': {
+      id: '/oauth/github/return'
+      path: '/oauth/github/return'
+      fullPath: '/oauth/github/return'
+      preLoaderRoute: typeof OauthGithubReturnRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
+  AuthenticatedDatabaseRoute: typeof AuthenticatedDatabaseRoute
+  AuthenticatedTransferRoute: typeof AuthenticatedTransferRoute
+  AuthenticatedSupabaseWithinRoute: typeof AuthenticatedSupabaseWithinRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAdminRoute: AuthenticatedAdminRoute,
+  AuthenticatedDatabaseRoute: AuthenticatedDatabaseRoute,
+  AuthenticatedTransferRoute: AuthenticatedTransferRoute,
+  AuthenticatedSupabaseWithinRoute: AuthenticatedSupabaseWithinRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  SplatRoute: SplatRoute,
+  AuthRoute: AuthRoute,
+  OauthGithubReturnRoute: OauthGithubReturnRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
