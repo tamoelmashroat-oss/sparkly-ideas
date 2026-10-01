@@ -17,6 +17,7 @@ import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedDatabaseRouteImport } from './routes/_authenticated/database'
 import { Route as AuthenticatedTransferRouteImport } from './routes/_authenticated/transfer'
 import { Route as AuthenticatedSupabaseWithinRouteImport } from './routes/_authenticated/supabase.within'
+import { Route as ApiPublicTransferTickRouteImport } from './routes/api/public/transfer-tick'
 import { Route as OauthGithubReturnRouteImport } from './routes/oauth/github/return'
 
 const IndexRoute = IndexRouteImport.update({
@@ -59,6 +60,11 @@ const AuthenticatedSupabaseWithinRoute =
     path: '/supabase/within',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const ApiPublicTransferTickRoute = ApiPublicTransferTickRouteImport.update({
+  id: '/api/public/transfer-tick',
+  path: '/api/public/transfer-tick',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OauthGithubReturnRoute = OauthGithubReturnRouteImport.update({
   id: '/oauth/github/return',
   path: '/oauth/github/return',
@@ -73,6 +79,7 @@ export interface FileRoutesByFullPath {
   '/database': typeof AuthenticatedDatabaseRoute
   '/transfer': typeof AuthenticatedTransferRoute
   '/supabase/within': typeof AuthenticatedSupabaseWithinRoute
+  '/api/public/transfer-tick': typeof ApiPublicTransferTickRoute
   '/oauth/github/return': typeof OauthGithubReturnRoute
 }
 export interface FileRoutesByTo {
@@ -83,6 +90,7 @@ export interface FileRoutesByTo {
   '/database': typeof AuthenticatedDatabaseRoute
   '/transfer': typeof AuthenticatedTransferRoute
   '/supabase/within': typeof AuthenticatedSupabaseWithinRoute
+  '/api/public/transfer-tick': typeof ApiPublicTransferTickRoute
   '/oauth/github/return': typeof OauthGithubReturnRoute
 }
 export interface FileRoutesById {
@@ -95,6 +103,7 @@ export interface FileRoutesById {
   '/_authenticated/database': typeof AuthenticatedDatabaseRoute
   '/_authenticated/transfer': typeof AuthenticatedTransferRoute
   '/_authenticated/supabase/within': typeof AuthenticatedSupabaseWithinRoute
+  '/api/public/transfer-tick': typeof ApiPublicTransferTickRoute
   '/oauth/github/return': typeof OauthGithubReturnRoute
 }
 export interface FileRouteTypes {
@@ -107,6 +116,7 @@ export interface FileRouteTypes {
     | '/database'
     | '/transfer'
     | '/supabase/within'
+    | '/api/public/transfer-tick'
     | '/oauth/github/return'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -117,6 +127,7 @@ export interface FileRouteTypes {
     | '/database'
     | '/transfer'
     | '/supabase/within'
+    | '/api/public/transfer-tick'
     | '/oauth/github/return'
   id:
     | '__root__'
@@ -128,6 +139,7 @@ export interface FileRouteTypes {
     | '/_authenticated/database'
     | '/_authenticated/transfer'
     | '/_authenticated/supabase/within'
+    | '/api/public/transfer-tick'
     | '/oauth/github/return'
   fileRoutesById: FileRoutesById
 }
@@ -136,6 +148,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   SplatRoute: typeof SplatRoute
   AuthRoute: typeof AuthRoute
+  ApiPublicTransferTickRoute: typeof ApiPublicTransferTickRoute
   OauthGithubReturnRoute: typeof OauthGithubReturnRoute
 }
 
@@ -197,6 +210,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSupabaseWithinRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/transfer-tick': {
+      id: '/api/public/transfer-tick'
+      path: '/api/public/transfer-tick'
+      fullPath: '/api/public/transfer-tick'
+      preLoaderRoute: typeof ApiPublicTransferTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/oauth/github/return': {
       id: '/oauth/github/return'
       path: '/oauth/github/return'
@@ -229,6 +249,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   SplatRoute: SplatRoute,
   AuthRoute: AuthRoute,
+  ApiPublicTransferTickRoute: ApiPublicTransferTickRoute,
   OauthGithubReturnRoute: OauthGithubReturnRoute,
 }
 export const routeTree = rootRouteImport
