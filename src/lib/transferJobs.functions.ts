@@ -44,7 +44,14 @@ export const startTransferJob = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { createJob } = await import("@/lib/transferEngine.server");
-    const { resolveSupabaseToken } = await import("@/lib/savedSupabaseTokens.server");
+    const { resolveSupabaseToken, saveSupabaseToken } = await import(
+      "@/lib/savedSupabaseTokens.server"
+    );
+    const source = await resolveSupabaseToken(context.userId, data.sourceToken);
+    const target = await resolveSupabaseToken(context.userId, data.targetToken);
+    // Remember real tokens used for a transfer so later transfers don't need them again.
+    if (source === data.sourceToken.trim()) await saveSupabaseToken(context.userId, "source", source);
+    if (target === data.targetToken.trim()) await saveSupabaseToken(context.userId, "target", target);
     const id = await createJob({
       userId: context.userId,
       kind: data.kind,
@@ -52,10 +59,7 @@ export const startTransferJob = createServerFn({ method: "POST" })
       targetRef: data.targetRef,
       sourceName: data.sourceName,
       targetName: data.targetName,
-      tokens: {
-        source: await resolveSupabaseToken(context.userId, data.sourceToken),
-        target: await resolveSupabaseToken(context.userId, data.targetToken),
-      },
+      tokens: { source, target },
     });
     return { id };
   });
