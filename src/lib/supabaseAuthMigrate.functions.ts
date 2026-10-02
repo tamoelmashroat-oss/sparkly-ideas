@@ -121,8 +121,10 @@ export const inspectAuthUsers = createServerFn({ method: "POST" })
     if (!input.token?.trim() || !input.ref?.trim()) throw new Error("حدّد مشروع المصدر.");
     return { token: input.token.trim(), ref: input.ref.trim() };
   })
-  .handler(async ({ data }) => {
-    const { token, ref } = data;
+  .handler(async ({ data, context }) => {
+    const { resolveSupabaseToken } = await import("@/lib/savedSupabaseTokens.server");
+    const token = await resolveSupabaseToken(context.userId, data.token);
+    const { ref } = data;
     const [totals, providers] = await Promise.all([
       runSql(
         token,

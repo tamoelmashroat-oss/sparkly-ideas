@@ -126,8 +126,9 @@ export const inspectStorage = createServerFn({ method: "POST" })
     if (!input.token?.trim() || !input.ref?.trim()) throw new Error("حدّد المشروع أولًا.");
     return { token: input.token.trim(), ref: input.ref.trim() };
   })
-  .handler(async ({ data }) => {
-    const buckets = await listBuckets(data.token, data.ref);
+  .handler(async ({ data, context }) => {
+    const { resolveSupabaseToken } = await import("@/lib/savedSupabaseTokens.server");
+    const buckets = await listBuckets(await resolveSupabaseToken(context.userId, data.token), data.ref);
     return {
       buckets,
       totalObjects: buckets.reduce((s, b) => s + b.objects, 0),
