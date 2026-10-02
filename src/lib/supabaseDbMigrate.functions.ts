@@ -219,15 +219,22 @@ export type SupabaseProject = { ref: string; name: string; region: string; organ
 
 export const listSupabaseProjects = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { token: string }) => {
+  .inputValidator((input: { token: string; side?: "source" | "target" | undefined }) => {
     const token = input.token?.trim();
     if (!token) throw new Error("أدخل رمز الوصول أولًا.");
-    return { token };
+    const side = input.side === "source" || input.side === "target" ? input.side : undefined;
+    return { token, side };
   })
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const { resolveSupabaseToken, saveSupabaseToken } = await import(
+      "@/lib/savedSupabaseTokens.server"
+    );
+    const token = await resolveSupabaseToken(context.userId, data.token);
     const projects = await mgmt<
       Array<{ id: string; name: string; region?: string; organization_id?: string }>
-    >(data.token, "/projects");
+    >(token, "/projects");
+    // A token that works is remembered (encrypted) so it's not needed again.
+    if (data.side && token === data.token) await saveSupabaseToken(context.userId, data.side, token);
     return projects.map<SupabaseProject>((p) => ({
       ref: p.id,
       name: p.name,
@@ -256,8 +263,10 @@ export const inspectSourceDb = createServerFn({ method: "POST" })
     if (!input.token?.trim() || !input.ref?.trim()) throw new Error("حدّد مشروع المصدر.");
     return { token: input.token.trim(), ref: input.ref.trim() };
   })
-  .handler(async ({ data }) => {
-    const { token, ref } = data;
+  .handler(async ({ data, context }) => {
+    const { resolveSupabaseToken } = await import("@/lib/savedSupabaseTokens.server");
+    const token = await resolveSupabaseToken(context.userId, data.token);
+    const { ref } = data;
     const [tablesRows, enums, functions, views, triggers, policies, indexes, sequences] =
       await Promise.all([
         runSql(token, ref, Q_TABLE_ROWS),
