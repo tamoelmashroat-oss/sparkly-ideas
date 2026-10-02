@@ -134,7 +134,7 @@ type StmtRun = {
   pass: number;
   applied: number;
   /** When set, statements before this index run one by one (after a batch failed). */
-  solo?: number;
+  solo?: number | undefined;
 };
 
 const BATCH_STMTS = 80;
