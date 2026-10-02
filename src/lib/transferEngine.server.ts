@@ -388,7 +388,10 @@ async function stepDb(ctx: Ctx, deadline: number): Promise<boolean> {
         }
         const r = c.run;
         job.stage = `المرحلة 4 من 4: العلاقات والفهارس وقواعد الحماية (${Math.min(r.i, r.list.length)}/${r.list.length})`;
-        if (!(await stepStatements(ctx, r, deadline))) return false;
+        if (!(await stepStatements(ctx, r, deadline))) {
+          job.stage = `المرحلة 4 من 4: العلاقات والفهارس وقواعد الحماية (${Math.min(r.i, r.list.length)}/${r.list.length}${r.pass ? ` — محاولة ${r.pass + 1}` : ""})`;
+          return false;
+        }
         finishRun(ctx, r, (c as Cursor & { runTotal?: number }).runTotal ?? 0);
         c.run = null;
         ctx.log("✔ تم النقل. المشروع الهدف الآن نسخة مطابقة للمصدر.");
