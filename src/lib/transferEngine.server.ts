@@ -525,12 +525,16 @@ async function stepStorage(ctx: Ctx, deadline: number): Promise<boolean> {
         }
       };
       // Copy several files at once instead of one after another.
+      // Big files go one at a time to keep memory low.
+      const big = (f: Row) => Number(f["size"] ?? 0) > 8 * 1024 * 1024;
+      const small = files.filter((f) => !big(f));
       let next = 0;
       await Promise.all(
-        Array.from({ length: Math.min(FILE_CONCURRENCY, files.length) }, async () => {
-          while (next < files.length) await copyOne(files[next++]!);
+        Array.from({ length: Math.min(FILE_CONCURRENCY, small.length) }, async () => {
+          while (next < small.length) await copyOne(small[next++]!);
         }),
       );
+      for (const f of files.filter(big)) await copyOne(f);
       c.offset = (c.offset ?? 0) + files.length;
       job.done += files.length;
       if (job.done > job.total) job.total = job.done;
