@@ -14,3 +14,4 @@
 - Use the splat route to redirect legacy `/index` visits to `/`; a dedicated index-named route collides with the root index route generator.
 - Supabase transfers run as resumable server-side jobs (`transfer_jobs` table + `src/lib/transferEngine.server.ts`); each advance does a bounded slice and saves a cursor, so work never depends on one long request or an open browser.
 - Background progress when no tab is open comes from `/api/public/transfer-tick` being called by an external scheduler; open tabs also advance jobs via `nudgeTransferJobs`.
+- Supabase access tokens are saved per user, encrypted, in app_user_connections (connector_id 'supabase'); the browser only sends a placeholder and server fns resolve it, so the real token never returns to the client.
