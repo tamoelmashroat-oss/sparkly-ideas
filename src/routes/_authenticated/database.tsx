@@ -1,9 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { JobHistory, JobPanel, useTransferJobs } from "@/components/TransferJobs";
 import { startTransferJob } from "@/lib/transferJobs.functions";
+import {
+  SAVED_TOKEN,
+  forgetSavedSupabaseToken,
+  getSavedSupabaseTokens,
+} from "@/lib/savedTokens.functions";
 import {
   Database,
   ExternalLink,
@@ -86,21 +91,60 @@ function DatabasePage() {
   const scanStorage = useServerFn(inspectStorage);
   const scanUsers = useServerFn(inspectAuthUsers);
   const startJob = useServerFn(startTransferJob);
-
-
+  const getSaved = useServerFn(getSavedSupabaseTokens);
+  const forgetToken = useServerFn(forgetSavedSupabaseToken);
 
   const loadProjects = useMutation({
-    mutationFn: async (side: Side) => {
-      const list = await fetchProjects({ data: { token: token[side].trim() } });
+    mutationFn: async (args: Side | { side: Side; tok: string }) => {
+      const side = typeof args === "string" ? args : args.side;
+      const tok = typeof args === "string" ? token[side].trim() : args.tok;
+      const list = await fetchProjects({ data: { token: tok, side } });
       return { side, list };
     },
     onSuccess: ({ side, list }) => {
       setProjects((p) => ({ ...p, [side]: list }));
+      // A successful fetch saves the token on the server; show it as saved.
+      setToken((t) => ({ ...t, [side]: SAVED_TOKEN[side] }));
+      const remembered = localStorage.getItem(`sb-transfer-ref-${side}`);
+      if (remembered && list.some((p) => p.ref === remembered))
+        setRef((r) => (r[side] ? r : { ...r, [side]: remembered }));
       setError(null);
       if (list.length === 0) setError("لا توجد مشاريع في هذا الحساب.");
     },
     onError: (e: Error) => setError(e.message),
   });
+
+  // Restore saved tokens (kept encrypted on the server) after a reload or sign-in.
+  useEffect(() => {
+    let cancelled = false;
+    getSaved()
+      .then((saved) => {
+        if (cancelled) return;
+        (["source", "target"] as Side[]).forEach((side) => {
+          if (!saved[side]) return;
+          setToken((t) => ({ ...t, [side]: SAVED_TOKEN[side] }));
+          fetchProjects({ data: { token: SAVED_TOKEN[side], side } })
+            .then((list) => {
+              if (cancelled) return;
+              setProjects((p) => ({ ...p, [side]: list }));
+              const remembered = localStorage.getItem(`sb-transfer-ref-${side}`);
+              if (remembered && list.some((p) => p.ref === remembered))
+                setRef((r) => ({ ...r, [side]: remembered }));
+            })
+            .catch((e: Error) => !cancelled && setError(e.message));
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [getSaved, fetchProjects]);
+
+  useEffect(() => {
+    (["source", "target"] as Side[]).forEach((side) => {
+      if (ref[side]) localStorage.setItem(`sb-transfer-ref-${side}`, ref[side]);
+    });
+  }, [ref]);
 
   const inspectSource = useMutation({
     mutationFn: () => inspect({ data: { token: token.source.trim(), ref: ref.source } }),
@@ -187,16 +231,35 @@ function DatabasePage() {
           </a>
         </div>
         <div className="flex gap-2">
-          <input
-            id={`token-${side}`}
-            type="password"
-            dir="ltr"
-            autoComplete="off"
-            value={token[side]}
-            onChange={(e) => setToken((t) => ({ ...t, [side]: e.target.value }))}
-            placeholder="sbp_..."
-            className="mono min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
-          />
+          {token[side] === SAVED_TOKEN[side] ? (
+            <div className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-lg border border-success/40 bg-success/10 px-3 py-2 text-sm text-success">
+              <span className="truncate">✓ الرمز محفوظ بأمان</span>
+              <button
+                type="button"
+                className="shrink-0 text-xs text-muted-foreground underline hover:text-foreground"
+                disabled={running}
+                onClick={async () => {
+                  await forgetToken({ data: { side } });
+                  setToken((t) => ({ ...t, [side]: "" }));
+                  setProjects((p) => ({ ...p, [side]: [] }));
+                  setRef((r) => ({ ...r, [side]: "" }));
+                }}
+              >
+                تغيير / حذف
+              </button>
+            </div>
+          ) : (
+            <input
+              id={`token-${side}`}
+              type="password"
+              dir="ltr"
+              autoComplete="off"
+              value={token[side]}
+              onChange={(e) => setToken((t) => ({ ...t, [side]: e.target.value }))}
+              placeholder="sbp_..."
+              className="mono min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+            />
+          )}
           <Button
             type="button"
             size="sm"
