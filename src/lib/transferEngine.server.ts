@@ -8,7 +8,8 @@ const API = "https://api.supabase.com/v1";
 const SLICE_MS = 20_000;
 const LOCK_MS = 60_000;
 const CHUNK = 200;
-const FILE_BATCH = 10;
+const FILE_BATCH = 48;
+const FILE_CONCURRENCY = 8;
 const USER_BATCH = 100;
 const MAX_FILE_BYTES = 40 * 1024 * 1024;
 const MAX_LOG = 400;
@@ -495,12 +496,12 @@ async function stepStorage(ctx: Ctx, deadline: number): Promise<boolean> {
          from storage.objects where bucket_id = ${lit(b.id)} and name is not null
          order by name offset ${c.offset ?? 0} limit ${FILE_BATCH}`,
       );
-      for (const f of files) {
+      const copyOne = async (f: Row) => {
         const name = str(f["name"]);
         const size = Number(f["size"] ?? 0);
         if (size > MAX_FILE_BYTES) {
           ctx.log(`   ↷ تُخطّي ${name} (كبير جدًا)`);
-          continue;
+          return;
         }
         try {
           const path = name.split("/").map(encodeURIComponent).join("/");
@@ -522,7 +523,14 @@ async function stepStorage(ctx: Ctx, deadline: number): Promise<boolean> {
         } catch (e) {
           ctx.warn(`${name} → ${(e as Error).message}`);
         }
-      }
+      };
+      // Copy several files at once instead of one after another.
+      let next = 0;
+      await Promise.all(
+        Array.from({ length: Math.min(FILE_CONCURRENCY, files.length) }, async () => {
+          while (next < files.length) await copyOne(files[next++]!);
+        }),
+      );
       c.offset = (c.offset ?? 0) + files.length;
       job.done += files.length;
       if (job.done > job.total) job.total = job.done;
