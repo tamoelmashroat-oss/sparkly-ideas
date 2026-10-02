@@ -127,7 +127,18 @@ where n.nspname = 'auth' and c.relname = ${lit(table)}
 
 /* --------------------------------- Cursor --------------------------------- */
 
-type StmtRun = { list: string[]; i: number; failed: Array<{ s: string; m: string }>; pass: number; applied: number };
+type StmtRun = {
+  list: string[];
+  i: number;
+  failed: Array<{ s: string; m: string }>;
+  pass: number;
+  applied: number;
+  /** When set, statements before this index run one by one (after a batch failed). */
+  solo?: number | undefined;
+};
+
+const BATCH_STMTS = 80;
+const BATCH_BYTES = 300_000;
 
 type Cursor = {
   phase: string;
@@ -174,7 +185,34 @@ class Ctx {
   }
 }
 
-/** Apply some statements of a multi-pass run; returns true when finished. */
+/** Run one statement; a foreign key that existing rows break is added NOT VALID. */
+async function runOne(ctx: Ctx, run: StmtRun, s: string) {
+  try {
+    await runSql(ctx.tok.target, ctx.job.target_ref, s);
+    run.applied += 1;
+  } catch (e) {
+    const m = (e as Error).message;
+    if (m.includes("23503") && /foreign key/i.test(s) && !/not valid/i.test(s)) {
+      try {
+        await runSql(ctx.tok.target, ctx.job.target_ref, s.replace(/;\s*$/, "") + " NOT VALID;");
+        run.applied += 1;
+        ctx.warn(
+          `أُضيفت علاقة بدون فحص الصفوف الحالية (بعض الصفوف تشير لسجلات غير موجودة — غالبًا حسابات مستخدمين لم تُنقل بعد): ${s.slice(0, 140)}`,
+        );
+        return;
+      } catch {
+        /* fall through to failure */
+      }
+    }
+    run.failed.push({ s, m });
+  }
+}
+
+/**
+ * Apply some statements of a multi-pass run; returns true when finished.
+ * Statements are sent in atomic batches (one request for many statements);
+ * if a batch fails, that batch is replayed one statement at a time.
+ */
 async function stepStatements(ctx: Ctx, run: StmtRun, deadline: number): Promise<boolean> {
   while (Date.now() < deadline) {
     if (run.i >= run.list.length) {
@@ -183,17 +221,38 @@ async function stepStatements(ctx: Ctx, run: StmtRun, deadline: number): Promise
       run.list = run.failed.map((f) => f.s);
       run.failed = [];
       run.i = 0;
+      run.solo = undefined;
       run.pass += 1;
       continue;
     }
-    const s = run.list[run.i]!;
-    try {
-      await runSql(ctx.tok.target, ctx.job.target_ref, s);
-      run.applied += 1;
-    } catch (e) {
-      run.failed.push({ s, m: (e as Error).message });
+    if (run.solo !== undefined && run.i < run.solo) {
+      await runOne(ctx, run, run.list[run.i]!);
+      run.i += 1;
+      continue;
     }
-    run.i += 1;
+    run.solo = undefined;
+    const batch: string[] = [];
+    let bytes = 0;
+    for (let j = run.i; j < run.list.length && batch.length < BATCH_STMTS; j++) {
+      const s = run.list[j]!;
+      if (batch.length > 0 && bytes + s.length > BATCH_BYTES) break;
+      batch.push(s);
+      bytes += s.length;
+    }
+    if (batch.length === 1) {
+      await runOne(ctx, run, batch[0]!);
+      run.i += 1;
+      continue;
+    }
+    // A DO block is all-or-nothing, so a failed batch leaves nothing half-applied.
+    const body = batch.map((s) => `execute ${lit(s.trim().replace(/;\s*$/, ""))};`).join("\n");
+    try {
+      await runSql(ctx.tok.target, ctx.job.target_ref, `do $lovable_batch$ begin\n${body}\nend $lovable_batch$;`);
+      run.applied += batch.length;
+      run.i += batch.length;
+    } catch {
+      run.solo = run.i + batch.length;
+    }
   }
   return false;
 }
@@ -329,7 +388,10 @@ async function stepDb(ctx: Ctx, deadline: number): Promise<boolean> {
         }
         const r = c.run;
         job.stage = `المرحلة 4 من 4: العلاقات والفهارس وقواعد الحماية (${Math.min(r.i, r.list.length)}/${r.list.length})`;
-        if (!(await stepStatements(ctx, r, deadline))) return false;
+        if (!(await stepStatements(ctx, r, deadline))) {
+          job.stage = `المرحلة 4 من 4: العلاقات والفهارس وقواعد الحماية (${Math.min(r.i, r.list.length)}/${r.list.length}${r.pass ? ` — محاولة ${r.pass + 1}` : ""})`;
+          return false;
+        }
         finishRun(ctx, r, (c as Cursor & { runTotal?: number }).runTotal ?? 0);
         c.run = null;
         ctx.log("✔ تم النقل. المشروع الهدف الآن نسخة مطابقة للمصدر.");
