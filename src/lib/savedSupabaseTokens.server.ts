@@ -29,15 +29,31 @@ export async function saveSupabaseToken(userId: string, side: TokenSide, token: 
   if (error) throw error;
 }
 
-export async function savedSupabaseSides(userId: string): Promise<Record<TokenSide, boolean>> {
+export type SavedSide = { saved: boolean; ref: string | null };
+
+export async function savedSupabaseSides(userId: string): Promise<Record<TokenSide, SavedSide>> {
   const db = await admin();
   const { data } = await db
     .from("app_user_connections")
-    .select("slot")
+    .select("slot, remembered_ref")
     .eq("user_id", userId)
     .eq("connector_id", CONNECTOR);
-  const s = new Set((data ?? []).map((r) => r.slot));
-  return { source: s.has("source"), target: s.has("target") };
+  const bySlot = new Map((data ?? []).map((r) => [r.slot, r.remembered_ref as string | null]));
+  return {
+    source: { saved: bySlot.has("source"), ref: bySlot.get("source") ?? null },
+    target: { saved: bySlot.has("target"), ref: bySlot.get("target") ?? null },
+  };
+}
+
+/** Remember the picked project ref for a side (survives new devices/browsers). */
+export async function saveSupabaseRef(userId: string, side: TokenSide, ref: string) {
+  const db = await admin();
+  await db
+    .from("app_user_connections")
+    .update({ remembered_ref: ref })
+    .eq("user_id", userId)
+    .eq("connector_id", CONNECTOR)
+    .eq("slot", side);
 }
 
 export async function forgetSupabaseToken(userId: string, side: TokenSide) {
