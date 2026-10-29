@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, ArrowLeftRight, CheckCircle2, Github, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AppBrandName } from "@/components/AppBrandName";
+import { RepositoryLink } from "@/components/RepositoryLink";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -52,7 +54,8 @@ function LandingPage() {
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                 <ArrowLeftRight className="h-4 w-4" />
               </span>
-              <span className="truncate text-sm font-semibold sm:text-base">ناقل المستودعات</span>
+              <AppBrandName />
+              <RepositoryLink />
             </div>
             <Button asChild variant="outline" size="sm" className="shrink-0">
               <Link to="/auth">تسجيل الدخول</Link>

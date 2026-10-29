@@ -23,6 +23,8 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { AppBrandName } from "@/components/AppBrandName";
+import { RepositoryLink } from "@/components/RepositoryLink";
 
 type NavItem = {
   to: string;
@@ -69,12 +71,15 @@ const sections: { title: string; items: NavItem[] }[] = [
 
 function Brand() {
   return (
-    <Link to="/transfer" search={{}} className="flex min-w-0 items-center gap-2.5 px-4 py-4">
+    <div className="flex min-w-0 items-center gap-1 px-4 py-4">
+    <Link to="/transfer" search={{}} className="flex min-w-0 flex-1 items-center gap-2.5">
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
         <Github className="h-4 w-4" />
       </span>
-      <span className="truncate text-sm font-semibold">ناقل المستودعات</span>
+      <AppBrandName />
     </Link>
+    <RepositoryLink />
+    </div>
   );
 }
 

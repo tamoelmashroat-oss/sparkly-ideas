@@ -2,7 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const GITHUB_API = "https://api.github.com";
 const LOVABLE_DIR = ".lovable/";
 
 
@@ -48,7 +47,11 @@ const SLOT_LABEL: Record<Slot, string> = {
 };
 
 /** عميل GitHub مرتبط بحساب المستخدم في خانة معيّنة. */
-async function makeClient(userId: string, slot: Slot) {
+async function makeClient(
+  userId: string,
+  slot: Slot,
+  sharedController?: import("./githubAdaptive.server").GithubAdaptiveController,
+) {
   const { getConnectionKeyForUser, markReconnectRequired } = await import(
     "@/lib/appUserConnections.server"
   );
@@ -56,34 +59,25 @@ async function makeClient(userId: string, slot: Slot) {
   if (!accessToken) {
     throw new Error(`${SLOT_LABEL[slot]} غير مربوط. اربط الحساب أولًا من الصفحة الرئيسية.`);
   }
-  const token = accessToken;
-
-  async function raw(path: string, init?: { method?: string; body?: unknown }) {
-    const res = await fetch(`${GITHUB_API}${path.startsWith("/") ? path : `/${path}`}`, {
-      method: init?.method ?? "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/vnd.github+json",
-        "User-Agent": "repo-transfer-app",
-        "X-GitHub-Api-Version": "2022-11-28",
-        ...(init?.body ? { "Content-Type": "application/json" } : {}),
-      },
-      ...(init?.body ? { body: JSON.stringify(init.body) } : {}),
-    });
-    if (res.status === 401) {
-      await markReconnectRequired(userId, slot);
-      throw new Error(
-        `انتهت صلاحية ربط ${SLOT_LABEL[slot]}. أعد ربط الحساب ثم حاول مرة أخرى.`,
-      );
-    }
-    return res;
-  }
-
+  const { GithubAdaptiveController, createGithubTransport, isGithubRateLimit } = await import(
+    "./githubAdaptive.server"
+  );
+  const controller = sharedController ?? new GithubAdaptiveController();
+  const raw = createGithubTransport(accessToken, controller, async () => {
+    await markReconnectRequired(userId, slot);
+    throw new Error(`انتهت صلاحية ربط ${SLOT_LABEL[slot]}. أعد ربط الحساب ثم حاول مرة أخرى.`);
+  });
 
   async function json<T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
     const res = await raw(path, init);
     const text = await res.text();
     if (!res.ok) {
+      if (isGithubRateLimit(res.status, text, res.headers)) {
+        throw new Error(
+          `GitHub أوقف طلبات ${SLOT_LABEL[slot]} مؤقتًا بسبب حجم المستودع (تجاوز حد معدل الطلبات). ` +
+            `انتظر بضع دقائق ثم أعد النقل؛ لن يُعتمد النقل النهائي قبل اكتمال نسخ الملفات والتحقق منها.`
+        );
+      }
       throw new Error(`فشل طلب GitHub لـ${SLOT_LABEL[slot]} (${res.status}): ${text.slice(0, 300)}`);
     }
     return (text ? JSON.parse(text) : {}) as T;
@@ -159,10 +153,12 @@ export const transferRepo = createServerFn({ method: "POST" })
     const target = data.target;
     const dryRun = data.dryRun ?? false;
 
-    const src = await makeClient(context.userId, "source");
+    const { GithubAdaptiveController, copyGithubBlobs } = await import("./githubAdaptive.server");
+    const controller = new GithubAdaptiveController();
+    const src = await makeClient(context.userId, "source", controller);
     const sameAccount = data.sameAccount ?? false;
     // داخل نفس الحساب: يُستخدم حساب المصدر للقراءة والكتابة معًا.
-    const tgt = sameAccount ? src : await makeClient(context.userId, "target");
+    const tgt = sameAccount ? src : await makeClient(context.userId, "target", controller);
 
     const [sourceAccount, targetAccount] = await Promise.all([
       src.json<{ id: number }>("/user"),
@@ -219,7 +215,8 @@ export const transferRepo = createServerFn({ method: "POST" })
           branches.find((b) => b.name === tgtBranch) ??
           branches.find((b) => b.name === srcBranch) ??
           branches.find((b) => b.name === "main" || b.name === "master") ??
-          branches[0]!;
+          branches[0];
+        if (!pick) throw new Error("تعذر تحديد الفرع الهدف.");
         tgtBranch = pick.name;
         refRes = await readRef(tgtBranch);
         if (!refRes.ok) {
@@ -369,25 +366,9 @@ export const transferRepo = createServerFn({ method: "POST" })
     }
 
     // ---- Copy changed blobs: read from source account, write to target account ----
-    const newShaByPath = new Map<string, string>();
-
-    for (let i = 0; i < changedPaths.length; i += 6) {
-      const chunk = changedPaths.slice(i, i + 6);
-      await Promise.all(
-        chunk.map(async (p) => {
-          const entry = srcBlobs.get(p);
-          if (!entry) throw new Error(`تعذر العثور على الملف المصدر: ${p}`);
-          const blob = await src.json<{ content: string }>(
-            `/repos/${source}/git/blobs/${entry.sha}`,
-          );
-          const created = await tgt.json<{ sha: string }>(`/repos/${target}/git/blobs`, {
-            method: "POST",
-            body: { content: blob.content, encoding: "base64" },
-          });
-          newShaByPath.set(p, created.sha);
-        }),
-      );
-    }
+    const newShaByPath = await copyGithubBlobs(
+      changedPaths, srcBlobs, source, target, src, tgt, controller,
+    );
 
     // ---- Assemble the new tree ----
     const treeEntries: Array<{
